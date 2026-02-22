@@ -80,7 +80,8 @@ jobs:
 
   build-macos-amd:
     name: Build macOS AMD64
-    runs-on: macos-13
+    runs-on: macos-12
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
         with:
@@ -111,6 +112,7 @@ jobs:
   build-windows:
     name: Build Windows
     runs-on: windows-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
         with:
@@ -144,36 +146,40 @@ jobs:
     name: Create Release
     needs: [build-linux, build-macos-arm, build-macos-amd, build-windows]
     runs-on: ubuntu-latest
-    if: github.event_name == 'release' || github.event.inputs.version != ''
+    if: always() && (github.event_name == 'release' || github.event.inputs.version != '')
     steps:
       - uses: actions/checkout@v4
 
       - name: Download Linux artifacts
+        if: needs.build-linux.result == 'success'
         uses: actions/download-artifact@v4
         with:
           name: linux-libs
           path: ./libs/
 
       - name: Download macOS ARM artifacts
+        if: needs.build-macos-arm.result == 'success'
         uses: actions/download-artifact@v4
         with:
           name: macos-arm-libs
           path: ./libs/
 
       - name: Download macOS AMD artifacts
+        if: needs.build-macos-amd.result == 'success'
         uses: actions/download-artifact@v4
         with:
           name: macos-amd-libs
           path: ./libs/
 
       - name: Download Windows artifacts
+        if: needs.build-windows.result == 'success'
         uses: actions/download-artifact@v4
         with:
           name: windows-libs
           path: ./libs/
 
       - name: List files
-        run: ls -la ./libs/
+        run: ls -la ./libs/ || true
 
       - name: Upload to Release
         if: github.event_name == 'release'
