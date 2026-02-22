@@ -63,7 +63,7 @@ jobs:
         run: cargo check --release
 
   integration:
-    name: Integration Tests
+    name: Full Tests (No Skip)
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [build, rust-check]
@@ -84,5 +84,17 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-hf-models-
 
-      - name: Run integration tests
-        run: go test -v -count=1 -timeout=10m ./pkg/candle/...
+      - name: Run full tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test -v -count=1 -timeout=10m ./pkg/candle/... | tee /tmp/full-tests.log
+
+      - name: Ensure no skipped tests
+        shell: bash
+        run: |
+          if grep -q -- '--- SKIP:' /tmp/full-tests.log; then
+            echo "Detected skipped tests in full test run."
+            grep -- '--- SKIP:' /tmp/full-tests.log
+            exit 1
+          fi
