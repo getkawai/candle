@@ -96,8 +96,8 @@ func DownloadModel(repoID, cacheDir string) (*ModelFiles, error) {
 }
 
 const (
-	DefaultLibraryVersion = "v0.1.4"
-	DefaultLibraryRepo    = "kawai-network/candle"
+	DefaultLibraryVersion = "v0.1.0"
+	DefaultLibraryRepo    = "getkawai/candle"
 )
 
 func getLibraryName() (string, error) {
