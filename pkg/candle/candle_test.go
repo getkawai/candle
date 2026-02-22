@@ -9,10 +9,9 @@ import (
 )
 
 func TestVersion(t *testing.T) {
-	// This will fail if the library isn't built yet, which is expected
-	// in CI with -short flag
+	// Fail fast when the binding cannot be initialized.
 	if !initialized {
-		t.Skip("candle library not initialized (binary not available)")
+		t.Fatalf("candle library not initialized (binary not available)")
 	}
 	v := Version()
 	if v == "" || v == "unknown" {
@@ -32,9 +31,6 @@ func TestInitIdempotent(t *testing.T) {
 }
 
 func TestDownloadModel(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping model download in short mode")
-	}
 
 	tmpDir := t.TempDir()
 	files, err := DownloadModel("sentence-transformers/all-MiniLM-L6-v2", tmpDir)
@@ -70,11 +66,8 @@ func TestDownloadModel(t *testing.T) {
 }
 
 func TestTextGeneration(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping model test in short mode")
-	}
 	if !initialized {
-		t.Skip("candle library not initialized")
+		t.Fatalf("candle library not initialized")
 	}
 
 	pipeline, err := NewTextGenerationPipeline(TextGenerationConfig{
@@ -100,11 +93,8 @@ func TestTextGeneration(t *testing.T) {
 }
 
 func TestEmbedding(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping model test in short mode")
-	}
 	if !initialized {
-		t.Skip("candle library not initialized")
+		t.Fatalf("candle library not initialized")
 	}
 
 	pipeline, err := NewEmbeddingPipeline(EmbeddingConfig{
@@ -186,11 +176,8 @@ func makeTestPNG(width, height int) []byte {
 }
 
 func TestClassification(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping model test in short mode")
-	}
 	if !initialized {
-		t.Skip("candle library not initialized")
+		t.Fatalf("candle library not initialized")
 	}
 
 	pipeline, err := NewClassificationPipeline(ClassificationConfig{
@@ -229,11 +216,8 @@ func TestClassification(t *testing.T) {
 }
 
 func TestClipEmbedText(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping model test in short mode")
-	}
 	if !initialized {
-		t.Skip("candle library not initialized")
+		t.Fatalf("candle library not initialized")
 	}
 
 	pipeline, err := NewClipPipeline(ClipConfig{
@@ -269,11 +253,8 @@ func TestClipEmbedText(t *testing.T) {
 }
 
 func TestClipScore(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping model test in short mode")
-	}
 	if !initialized {
-		t.Skip("candle library not initialized")
+		t.Fatalf("candle library not initialized")
 	}
 
 	pipeline, err := NewClipPipeline(ClipConfig{
@@ -370,11 +351,8 @@ func createTestWAV(t *testing.T, durationSecs float64) string {
 }
 
 func TestWhisper(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping model test in short mode")
-	}
 	if !initialized {
-		t.Skip("candle library not initialized")
+		t.Fatalf("candle library not initialized")
 	}
 
 	pipeline, err := NewWhisperPipeline(WhisperConfig{
@@ -405,11 +383,8 @@ func TestWhisper(t *testing.T) {
 }
 
 func TestT5(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping model test in short mode")
-	}
 	if !initialized {
-		t.Skip("candle library not initialized")
+		t.Fatalf("candle library not initialized")
 	}
 
 	pipeline, err := NewT5Pipeline(T5Config{
@@ -437,11 +412,8 @@ func TestT5(t *testing.T) {
 }
 
 func TestTranslation(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping model test in short mode")
-	}
 	if !initialized {
-		t.Skip("candle library not initialized")
+		t.Fatalf("candle library not initialized")
 	}
 
 	pipeline, err := NewTranslationPipeline(TranslationConfig{
@@ -467,26 +439,16 @@ func TestTranslation(t *testing.T) {
 
 func TestVideoAvailability(t *testing.T) {
 	if !initialized {
-		t.Skip("candle library not initialized")
+		t.Fatalf("candle library not initialized")
 	}
 
 	available := IsVideoAvailable()
 	t.Logf("Video pipeline available: %v", available)
-
-	if !available {
-		t.Log("Video pipeline not available - video tests will be skipped")
-	}
 }
 
 func TestVideoPipeline(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping video generation test in short mode")
-	}
 	if !initialized {
-		t.Skip("candle library not initialized")
-	}
-	if !IsVideoAvailable() {
-		t.Skip("video pipeline not available in loaded binding")
+		t.Fatalf("candle library not initialized")
 	}
 
 	pipeline, err := NewVideoPipeline(VideoConfig{
