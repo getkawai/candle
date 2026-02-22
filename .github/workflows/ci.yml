@@ -139,6 +139,13 @@ jobs:
         with:
           go-version: "1.24"
 
+      - name: Setup CUDA toolkit
+        uses: Jimver/cuda-toolkit@v0.2.24
+        with:
+          cuda: "12.6.0"
+          method: "network"
+          use-github-cache: true
+
       - uses: dtolnay/rust-toolchain@stable
 
       - uses: actions/cache@v4
