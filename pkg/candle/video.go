@@ -37,6 +37,8 @@ type VideoResult struct {
 	Frames     []VideoFrame
 	FrameCount int
 	FPS        int
+
+	cPtr *C.VideoResult
 }
 
 type VideoPipeline struct {
@@ -91,14 +93,15 @@ func (p *VideoPipeline) Generate(prompt string, params VideoGenerationParams) (*
 	if res == nil {
 		return nil, errors.New(lastError())
 	}
-	defer C.call_free_video_result(fnFreeVideoResult, res)
 
 	if res.error != nil {
 		errMsg := C.GoString(res.error)
+		C.call_free_video_result(fnFreeVideoResult, res)
 		return nil, errors.New(errMsg)
 	}
 
 	if res.frame_count == 0 || res.frames == nil {
+		C.call_free_video_result(fnFreeVideoResult, res)
 		return nil, errors.New("no frames generated")
 	}
 
@@ -107,6 +110,7 @@ func (p *VideoPipeline) Generate(prompt string, params VideoGenerationParams) (*
 		Frames:     make([]VideoFrame, res.frame_count),
 		FrameCount: int(res.frame_count),
 		FPS:        int(res.fps),
+		cPtr:       res,
 	}
 
 	for i, frame := range frames {
@@ -130,6 +134,9 @@ func (p *VideoPipeline) Generate(prompt string, params VideoGenerationParams) (*
 		}
 	}
 
+	runtime.SetFinalizer(result, func(obj *VideoResult) {
+		obj.Close()
+	})
 	return result, nil
 }
 
@@ -140,11 +147,22 @@ func (p *VideoPipeline) Close() {
 	}
 }
 
+func (r *VideoResult) Close() {
+	if r.cPtr != nil {
+		C.call_free_video_result(fnFreeVideoResult, r.cPtr)
+		r.cPtr = nil
+	}
+}
+
 func (r *VideoResult) SaveGIF(outputPath string) error {
+	if r.cPtr == nil {
+		return errors.New("video result is already closed or data not available for C export")
+	}
+
 	cPath := C.CString(outputPath)
 	defer C.free(unsafe.Pointer(cPath))
 
-	ret := C.call_save_video_as_gif(fnSaveVideoAsGif, nil, cPath)
+	ret := C.call_save_video_as_gif(fnSaveVideoAsGif, r.cPtr, cPath)
 	if ret != 0 {
 		return errors.New("failed to save video as GIF")
 	}
@@ -152,12 +170,20 @@ func (r *VideoResult) SaveGIF(outputPath string) error {
 }
 
 func (r *VideoResult) SaveFrames(outputDir string) error {
+	if r.cPtr == nil {
+		return errors.New("video result is already closed or data not available for C export")
+	}
+
 	cDir := C.CString(outputDir)
 	defer C.free(unsafe.Pointer(cDir))
 
-	ret := C.call_save_video_frames(fnSaveVideoFrames, nil, cDir)
+	ret := C.call_save_video_frames(fnSaveVideoFrames, r.cPtr, cDir)
 	if ret != 0 {
 		return errors.New("failed to save video frames")
 	}
 	return nil
+}
+
+func IsVideoAvailable() bool {
+	return videoAvailable
 }

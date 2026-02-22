@@ -353,13 +353,13 @@ func createTestWAV(t *testing.T, durationSecs float64) string {
 
 	// fmt chunk
 	f.Write([]byte("fmt "))
-	binary.Write(f, binary.LittleEndian, uint32(16))  // chunk size
-	binary.Write(f, binary.LittleEndian, uint16(1))    // PCM format
-	binary.Write(f, binary.LittleEndian, uint16(1))    // mono
+	binary.Write(f, binary.LittleEndian, uint32(16)) // chunk size
+	binary.Write(f, binary.LittleEndian, uint16(1))  // PCM format
+	binary.Write(f, binary.LittleEndian, uint16(1))  // mono
 	binary.Write(f, binary.LittleEndian, uint32(sampleRate))
 	binary.Write(f, binary.LittleEndian, uint32(sampleRate*2)) // byte rate
-	binary.Write(f, binary.LittleEndian, uint16(2))    // block align
-	binary.Write(f, binary.LittleEndian, uint16(16))   // bits per sample
+	binary.Write(f, binary.LittleEndian, uint16(2))            // block align
+	binary.Write(f, binary.LittleEndian, uint16(16))           // bits per sample
 
 	// data chunk
 	f.Write([]byte("data"))
@@ -462,5 +462,88 @@ func TestTranslation(t *testing.T) {
 	t.Logf("Translation (fr->en): %s", result)
 
 	// Test double close
+	pipeline.Close()
+}
+
+func TestVideoAvailability(t *testing.T) {
+	if !initialized {
+		t.Skip("candle library not initialized")
+	}
+
+	available := IsVideoAvailable()
+	t.Logf("Video pipeline available: %v", available)
+
+	if !available {
+		t.Log("Video pipeline not available - video tests will be skipped")
+	}
+}
+
+func TestVideoPipeline(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping video generation test in short mode")
+	}
+	if !initialized {
+		t.Skip("candle library not initialized")
+	}
+	if !IsVideoAvailable() {
+		t.Skip("video pipeline not available in loaded binding")
+	}
+
+	pipeline, err := NewVideoPipeline(VideoConfig{
+		ModelID: "Lightricks/LTX-Video-2b-v0.9",
+	})
+	if err != nil {
+		t.Fatalf("NewVideoPipeline failed: %v", err)
+	}
+	defer pipeline.Close()
+
+	params := VideoGenerationParams{
+		Height:            256,
+		Width:             256,
+		NumFrames:         9,
+		NumInferenceSteps: 1,
+		GuidanceScale:     3.0,
+		FrameRate:         24,
+		Seed:              42,
+	}
+
+	result, err := pipeline.Generate("A test video of a red square", params)
+	if err != nil {
+		t.Fatalf("Generate failed: %v", err)
+	}
+	defer result.Close()
+
+	if result.FrameCount == 0 {
+		t.Error("no frames generated")
+	}
+
+	t.Logf("Generated %d frames at %d fps", result.FrameCount, result.FPS)
+
+	if len(result.Frames) > 0 {
+		frame := result.Frames[0]
+		t.Logf("Frame 0: %dx%d, %d channels, %d pixels", frame.Width, frame.Height, frame.Channels, len(frame.Data))
+
+		if frame.Width != 256 || frame.Height != 256 {
+			t.Errorf("unexpected frame dimensions: %dx%d", frame.Width, frame.Height)
+		}
+		if frame.Channels != 3 {
+			t.Errorf("expected 3 channels (RGB), got %d", frame.Channels)
+		}
+	}
+
+	outputDir := t.TempDir()
+	if err := result.SaveFrames(outputDir); err != nil {
+		t.Errorf("SaveFrames failed: %v", err)
+	}
+
+	gifPath := filepath.Join(t.TempDir(), "test.gif")
+	if err := result.SaveGIF(gifPath); err != nil {
+		t.Errorf("SaveGIF failed: %v", err)
+	}
+
+	if _, err := os.Stat(gifPath); err == nil {
+		t.Logf("GIF saved to %s", gifPath)
+	}
+
 	pipeline.Close()
 }

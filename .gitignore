@@ -18,3 +18,7 @@ Thumbs.db
 
 # Temp files from library extraction
 /tmp/go-candle-*
+
+# Example binaries
+/video
+examples/*/video
