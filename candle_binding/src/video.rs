@@ -1,16 +1,9 @@
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
-use std::path::PathBuf;
-use std::sync::Arc;
-
-use candle_core::{DType, Device, Tensor};
-use candle_video::models::ltx_video::{
-    configs, loader, ltx_transformer, scheduler, t2v_pipeline, text_encoder, vae,
-};
 
 use candle_core::{DType, Device, Tensor};
 
-use crate::{json_f64, json_str, json_u64, parse_config_json, set_last_error};
+use crate::{json_str, json_u64, parse_config_json, set_last_error};
 
 pub struct VideoPipelineWrapper {
     device: Device,
@@ -270,17 +263,16 @@ fn save_gif(result: &VideoResult, output_path: &str) -> anyhow::Result<()> {
             let r = (data[i * 3].clamp(0.0, 1.0) * 255.0) as u8;
             let g = (data[i * 3 + 1].clamp(0.0, 1.0) * 255.0) as u8;
             let b = (data[i * 3 + 2].clamp(0.0, 1.0) * 255.0) as u8;
-
             let gray = ((r as u16 + g as u16 + b as u16) / 3) as u8;
             pixels.push(gray);
         }
 
-        let palette: Vec<[u8; 3]> = (0..=255).map(|i| [i, i, i]).collect();
+        let palette: Vec<u8> = (0..=255).flat_map(|i| [i, i, i]).collect();
         let mut gif_frame = Frame::from_palette_pixels(
             frame.width as u16,
             frame.height as u16,
             pixels,
-            &palette,
+            palette,
             None,
         );
         gif_frame.delay = (100 / result.fps.max(1)) as u16;
