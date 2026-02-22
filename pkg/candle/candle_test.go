@@ -509,3 +509,46 @@ func TestVideoPipeline(t *testing.T) {
 
 	pipeline.Close()
 }
+
+func TestDownloadLibrary(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping library download test in short mode")
+	}
+
+	tmpDir := t.TempDir()
+
+	libPath, err := DownloadLibrary(LibraryBasic, "v0.1.4", tmpDir)
+	if err != nil {
+		t.Fatalf("DownloadLibrary failed: %v", err)
+	}
+
+	if _, err := os.Stat(libPath); os.IsNotExist(err) {
+		t.Fatalf("downloaded library not found: %s", libPath)
+	}
+
+	t.Logf("Downloaded library to: %s", libPath)
+
+	info, err := os.Stat(libPath)
+	if err != nil {
+		t.Fatalf("failed to stat library: %v", err)
+	}
+	t.Logf("Library size: %d bytes", info.Size())
+}
+
+func TestEnsureVideoLibrary(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping video library test in short mode")
+	}
+
+	libPath, err := EnsureVideoLibrary("v0.1.4")
+	if err != nil {
+		t.Logf("EnsureVideoLibrary returned: %v (video library may not be available yet)", err)
+		return
+	}
+
+	t.Logf("Video library path: %s", libPath)
+
+	if _, err := os.Stat(libPath); os.IsNotExist(err) {
+		t.Errorf("video library not found: %s", libPath)
+	}
+}
