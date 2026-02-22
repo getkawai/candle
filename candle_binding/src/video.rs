@@ -4,15 +4,13 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use candle_core::{DType, Device, Tensor};
-use candle_nn::VarBuilder;
 use candle_video::models::ltx_video::{
     configs, loader, ltx_transformer, scheduler, t2v_pipeline, text_encoder, vae,
 };
 
-use crate::{
-    create_hf_repo, json_bool, json_f64, json_str, json_u64, load_weight_files, parse_config_json,
-    set_last_error,
-};
+use candle_core::{DType, Device, Tensor};
+
+use crate::{json_f64, json_str, json_u64, parse_config_json, set_last_error};
 
 pub struct VideoPipelineWrapper {
     device: Device,
@@ -143,22 +141,9 @@ pub extern "C" fn run_video_generation(
     let height = json_u64(&params, "height", 512) as usize;
     let width = json_u64(&params, "width", 704) as usize;
     let num_frames = json_u64(&params, "num_frames", 65) as usize;
-    let num_inference_steps = json_u64(&params, "num_inference_steps", 30) as usize;
-    let guidance_scale = json_f64(&params, "guidance_scale", 3.0) as f32;
     let frame_rate = json_u64(&params, "frame_rate", 24) as usize;
-    let seed = json_u64(&params, "seed", 0) as u64;
 
-    match generate_video(
-        wrapper,
-        prompt_str,
-        height,
-        width,
-        num_frames,
-        num_inference_steps,
-        guidance_scale,
-        frame_rate,
-        seed,
-    ) {
+    match generate_video(wrapper, prompt_str, height, width, num_frames, frame_rate) {
         Ok(result) => Box::into_raw(Box::new(result)),
         Err(e) => {
             let err_cstr =
@@ -176,14 +161,11 @@ pub extern "C" fn run_video_generation(
 
 fn generate_video(
     wrapper: &VideoPipelineWrapper,
-    prompt: &str,
+    _prompt: &str,
     height: usize,
     width: usize,
     num_frames: usize,
-    num_inference_steps: usize,
-    guidance_scale: f32,
     frame_rate: usize,
-    _seed: u64,
 ) -> anyhow::Result<VideoResult> {
     let device = &wrapper.device;
     let dtype = wrapper.dtype;
@@ -192,7 +174,7 @@ fn generate_video(
     let latent_width = width / 32;
     let latent_frames = (num_frames - 1) / 8 + 1;
 
-    let latents = Tensor::randn(
+    let _latents = Tensor::randn(
         0f32,
         1f32,
         (1usize, 128usize, latent_frames, latent_height, latent_width),
@@ -254,20 +236,25 @@ fn save_gif(result: &VideoResult, output_path: &str) -> anyhow::Result<()> {
     use gif::{Encoder, Frame, Repeat};
     use std::fs::File;
 
-    let file = File::create(output_path)?;
-    let mut encoder = Encoder::new(
-        file,
-        result.frames[0].width as u16,
-        result.frames[0].height as u16,
-        &[],
-    )?;
-    encoder.set_repeat(Repeat::Infinite)?;
-
     if result.frames.is_null() || result.frame_count == 0 {
         return Ok(());
     }
 
     let frames = unsafe { std::slice::from_raw_parts(result.frames, result.frame_count) };
+
+    if frames.is_empty() || frames[0].data.is_null() {
+        return Ok(());
+    }
+
+    let first_frame = &frames[0];
+    let file = File::create(output_path)?;
+    let mut encoder = Encoder::new(
+        file,
+        first_frame.width as u16,
+        first_frame.height as u16,
+        &[],
+    )?;
+    encoder.set_repeat(Repeat::Infinite)?;
 
     for frame in frames {
         if frame.data.is_null() {
@@ -288,14 +275,15 @@ fn save_gif(result: &VideoResult, output_path: &str) -> anyhow::Result<()> {
             pixels.push(gray);
         }
 
+        let palette: Vec<[u8; 3]> = (0..=255).map(|i| [i, i, i]).collect();
         let mut gif_frame = Frame::from_palette_pixels(
             frame.width as u16,
             frame.height as u16,
-            &pixels,
-            &(0..=255).map(|i| [i, i, i]).collect::<Vec<_>>(),
+            pixels,
+            &palette,
             None,
         );
-        gif_frame.delay = (100 / result.fps) as u16;
+        gif_frame.delay = (100 / result.fps.max(1)) as u16;
         encoder.write_frame(&gif_frame)?;
     }
 
